@@ -8,7 +8,7 @@ while (isRunning)
     Console.WriteLine("Введите команду: ");
     string command = Console.ReadLine()?.Trim() ?? "";
 
-    if (command == "")
+    if (string.IsNullOrWhiteSpace(command)) //(command == "")
     {
         Console.WriteLine("Команда не может быть пустой. Пожалуйста, попробуйте снова.");
         continue;
@@ -16,13 +16,13 @@ while (isRunning)
 
     if (command.StartsWith("/echo", StringComparison.OrdinalIgnoreCase))
     {
-        if (userName is null)
+        if (string.IsNullOrWhiteSpace(userName))
         {
             Console.WriteLine("Команда /echo станет доступна после команды /start.");
             continue;
         }
         string echoText = command["/echo".Length..].Trim();
-        if (echoText == "")
+        if (string.IsNullOrWhiteSpace(echoText))
         {
             Console.WriteLine("Текст для повторения не может быть пустым. Пожалуйста, попробуйте снова.");
             continue;
@@ -37,7 +37,7 @@ while (isRunning)
             Console.WriteLine("Введите ваше имя:");
             userName = Console.ReadLine()?.Trim() ?? "";
 
-            if (userName == "")
+            if (string.IsNullOrWhiteSpace(userName))
             {
                 Console.WriteLine("Имя не может быть пустым. Пожалуйста, попробуйте снова.");
                 continue;
@@ -47,19 +47,19 @@ while (isRunning)
             break;
         case "/help":
             //Console.WriteLine(GetGreeting(userName) + "Доступные команды:");
-            Console.WriteLine(userName is null ? "Доступные команды:" : $"{userName}, доступные команды:");
+            Console.WriteLine(string.IsNullOrWhiteSpace(userName) ? "Доступные команды:" : $"{userName}, доступные команды:");
             ShowCommands();
-            if (userName is not null)
+            if (!(string.IsNullOrWhiteSpace(userName))) //(userName is not null)
             {
                 Console.WriteLine("/echo <текст> — Повтор введённого текста");
             }
             break;
         case "/info":
-            Console.WriteLine(userName is null ? "Версия программы: 1.0. Дата создания: 18.07.2026." : $"{userName}, версия программы: 1.0. Дата создания: 18.07.2026.");
+            Console.WriteLine(string.IsNullOrWhiteSpace(userName) ? "Версия программы: 1.0. Дата создания: 18.07.2026." : $"{userName}, версия программы: 1.0. Дата создания: 18.07.2026.");
             break;
         case "/exit":
             isRunning = false;
-            Console.WriteLine(userName is null ? "До свидания!" : $"{userName}, до свидания!");
+            Console.WriteLine(string.IsNullOrWhiteSpace(userName) ? "До свидания!" : $"{userName}, до свидания!");
             break;
         default:
             Console.WriteLine("Неизвестная команда. Используйте /help для получения справки.");
