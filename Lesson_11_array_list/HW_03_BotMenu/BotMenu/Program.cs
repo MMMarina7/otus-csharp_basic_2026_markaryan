@@ -9,7 +9,7 @@ while (isRunning)
     Console.WriteLine("Введите команду: ");
     string command = Console.ReadLine()?.Trim() ?? "";
 
-    if (string.IsNullOrWhiteSpace(command)) //(command == "")
+    if (string.IsNullOrWhiteSpace(command)) 
     {
         Console.WriteLine("Команда не может быть пустой. Пожалуйста, попробуйте снова.");
         continue;
@@ -48,10 +48,9 @@ while (isRunning)
                     "Чем могу помочь?");
             break;
         case "/help":
-            //Console.WriteLine(GetGreeting(userName) + "Доступные команды:");
             Console.WriteLine(string.IsNullOrWhiteSpace(userName) ? "Доступные команды:" : $"{userName}, доступные команды:");
             ShowCommands();
-            if (!(string.IsNullOrWhiteSpace(userName))) //(userName is not null)
+            if (!(string.IsNullOrWhiteSpace(userName))) 
             {
                 Console.WriteLine("/echo <текст> — Повтор введённого текста");
             }
@@ -60,15 +59,7 @@ while (isRunning)
             Console.WriteLine(string.IsNullOrWhiteSpace(userName) ? "Версия программы: 1.0. Дата создания: 18.07.2026." : $"{userName}, версия программы: 1.0. Дата создания: 18.07.2026.");
             break;
          case "/addtask":
-            Console.Write("Пожалуйста, введите описание задачи: ");
-            string taskDescription = Console.ReadLine()?.Trim() ?? "";
-
-            if (string.IsNullOrWhiteSpace(taskDescription)) //(command == "")
-            {
-                Console.WriteLine("Описание задачи не может быть пустым. Пожалуйста, попробуйте снова.");
-                continue;
-            }
-            AddTask(taskDescription, tasks);
+            AddTask(tasks);
             break;
          case "/showtasks":
             ShowTasks(tasks);
@@ -123,8 +114,16 @@ static void ShowTasks(List<string> tasks)
     }
 }
 
-static void AddTask(string taskDescription, List<string> tasks)
+static void AddTask(List<string> tasks)
 {
+    Console.Write("Пожалуйста, введите описание задачи: ");
+    string taskDescription = Console.ReadLine()?.Trim() ?? "";
+
+    if (string.IsNullOrWhiteSpace(taskDescription)) 
+    {
+        Console.WriteLine("Описание задачи не может быть пустым. Пожалуйста, попробуйте снова.");
+        return;
+    }
     tasks.Add(taskDescription);
     Console.WriteLine($"Задача \"{taskDescription}\" добавлена.");
 }
@@ -140,7 +139,3 @@ static void ShowCommands()
     Console.WriteLine("/removetask - Удалить задачу");
 }
 
-// static string GetGreeting(string? userName)
-// {
-//     return userName is null ? "" : $"{userName}, ";
-// }
