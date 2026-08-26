@@ -160,7 +160,7 @@ static ToDoUser HandleStartCommand()
 
     ValidateString(telegramUserName);
 
-    ToDoUser user = new ToDoUser(telegramUserName!.Trim());
+    ToDoUser user = new ToDoUser(telegramUserName);
     
     string greetingMessage = $"Привет, {user.TelegramUserName}! " + 
             "Чем могу помочь?";
@@ -227,7 +227,7 @@ static void HandleShowTasksCommand(List<ToDoItem> tasks)
 {
     List<ToDoItem> activeTasks = tasks.Where(t => t.State == ToDoItemState.Active).ToList();
 
-    if (activeTasks.Count == 0)
+    if (!activeTasks.Any())
     {
         Console.WriteLine("Список активных задач пуст.");
         return;
@@ -241,7 +241,7 @@ static void HandleShowTasksCommand(List<ToDoItem> tasks)
 
 static void HandleRemoveTaskCommand(List<ToDoItem> tasks)
 {
-    if (tasks.Count == 0)
+    if (!tasks.Any())
     {
         Console.WriteLine("Список задач пуст. Нет задач для удаления.");
         return;
@@ -281,7 +281,7 @@ static void HandleExitCommand(ToDoUser? user, ref bool isRunning)
 
 static void HandleCompleteTaskCommand(string command, List<ToDoItem> tasks)
 {
-    if (tasks.Count == 0)
+    if (!tasks.Any())
     {
         Console.WriteLine("Список задач пуст. Нет задач для выполнения.");
         return;
@@ -315,7 +315,7 @@ static void HandleCompleteTaskCommand(string command, List<ToDoItem> tasks)
 
 static void HandleShowAllTasksCommand(List<ToDoItem> tasks)
 {
-    if (tasks.Count == 0)
+    if (!tasks.Any())
     {
         Console.WriteLine("Список задач пуст.");
         return;
