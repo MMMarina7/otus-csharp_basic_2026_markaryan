@@ -27,3 +27,7 @@ artifacts/
 *.cache
 *.pidb
 *.pdb
+
+# Archives and downloaded materials
+*.zip
+C-Sharp-Basic-main/
