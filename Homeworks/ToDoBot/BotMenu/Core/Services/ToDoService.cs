@@ -1,29 +1,27 @@
 public class ToDoService : IToDoService
 {
-    private readonly List<ToDoItem> _tasks = new();
+    private readonly IToDoRepository _toDoRepository;
     private readonly int _maxTaskCount;
     private readonly int _maxTaskLength;
 
-    public ToDoService(int maxTaskCount, int maxTaskLength)
+    public ToDoService(
+        IToDoRepository toDoRepository,
+        int maxTaskCount,
+        int maxTaskLength)
     {
+        _toDoRepository = toDoRepository;
         _maxTaskCount = maxTaskCount;
         _maxTaskLength = maxTaskLength;
     }
 
     public IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId)
     {
-        return _tasks
-            .Where(task => task.User.UserId == userId)
-            .ToList();
+        return _toDoRepository.GetAllByUserId(userId);
     }
 
     public IReadOnlyList<ToDoItem> GetActiveByUserId(Guid userId)
     {
-        return _tasks
-            .Where(task =>
-                task.User.UserId == userId &&
-                task.State == ToDoItemState.Active)
-            .ToList();
+        return _toDoRepository.GetActiveByUserId(userId);
     }
 
     public ToDoItem Add(ToDoUser user, string name)
@@ -39,35 +37,32 @@ public class ToDoService : IToDoService
 
         name = name.Trim();
 
-        IReadOnlyList<ToDoItem> userTasks = GetAllByUserId(user.UserId);
-
-        if (userTasks.Count >= _maxTaskCount)
+        if (_toDoRepository.CountActive(user.UserId) >= _maxTaskCount)
         {
             throw new TaskCountLimitException(_maxTaskCount);
         }
 
         if (name.Length > _maxTaskLength)
         {
-            throw new TaskLengthLimitException(name.Length, _maxTaskLength);
+            throw new TaskLengthLimitException(
+                name.Length,
+                _maxTaskLength);
         }
 
-        bool taskExists = userTasks.Any(task =>
-            task.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-
-        if (taskExists)
+        if (_toDoRepository.ExistsByName(user.UserId, name))
         {
             throw new DuplicateTaskException(name);
         }
 
         ToDoItem task = new ToDoItem(name, user);
-        _tasks.Add(task);
+        _toDoRepository.Add(task);
 
         return task;
     }
 
     public void MarkCompleted(Guid id)
     {
-        ToDoItem? task = _tasks.FirstOrDefault(task => task.Id == id);
+        ToDoItem? task = _toDoRepository.Get(id);
 
         if (task == null)
         {
@@ -78,11 +73,13 @@ public class ToDoService : IToDoService
 
         task.State = ToDoItemState.Completed;
         task.StateChangedAt = DateTime.UtcNow;
+
+        _toDoRepository.Update(task);
     }
 
     public void Delete(Guid id)
     {
-        ToDoItem? task = _tasks.FirstOrDefault(task => task.Id == id);
+        ToDoItem? task = _toDoRepository.Get(id);
 
         if (task == null)
         {
@@ -91,6 +88,26 @@ public class ToDoService : IToDoService
                 nameof(id));
         }
 
-        _tasks.Remove(task);
+        _toDoRepository.Delete(id);
+    }
+
+    public IReadOnlyList<ToDoItem> Find(ToDoUser user, string namePrefix)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        if (string.IsNullOrWhiteSpace(namePrefix))
+        {
+            throw new ArgumentException(
+                "Начало названия задачи не может быть пустым.",
+                nameof(namePrefix));
+        }
+
+        namePrefix = namePrefix.Trim();
+
+        return _toDoRepository.Find(
+            user.UserId,
+            task => task.Name.StartsWith(
+                namePrefix,
+                StringComparison.OrdinalIgnoreCase));
     }
 }

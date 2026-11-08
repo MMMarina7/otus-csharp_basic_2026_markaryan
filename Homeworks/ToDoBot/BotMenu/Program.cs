@@ -6,11 +6,16 @@ try
 
     int maxTaskLength = ReadLimit("Введите максимально допустимую длину задачи:");
 
-    IUserService userService = new UserService();
+    IUserRepository userRepository = new InMemoryUserRepository();
 
-    IToDoService toDoService = new ToDoService(maxTaskCount, maxTaskLength);
+    IUserService userService = new UserService(userRepository);
 
-    IUpdateHandler updateHandler = new UpdateHandler(userService, toDoService);
+    IToDoRepository toDoRepository = new InMemoryToDoRepository();
+
+    IToDoService toDoService = new ToDoService(toDoRepository, maxTaskCount, maxTaskLength);
+
+    IToDoReportService toDoReportService = new ToDoReportService(toDoRepository);
+    IUpdateHandler updateHandler = new UpdateHandler(userService, toDoService, toDoReportService);
 
     ITelegramBotClient botClient = new ConsoleBotClient();
 

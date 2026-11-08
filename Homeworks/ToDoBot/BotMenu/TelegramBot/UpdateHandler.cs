@@ -5,16 +5,16 @@ public class UpdateHandler : IUpdateHandler
 {
     private readonly IUserService _userService;
     private readonly IToDoService _toDoService;
+    private readonly IToDoReportService _toDoReportService;
 
-    public UpdateHandler(IUserService userService, IToDoService toDoService)
+    public UpdateHandler(IUserService userService, IToDoService toDoService, IToDoReportService toDoReportService)
     {
         _userService = userService;
         _toDoService = toDoService;
+        _toDoReportService = toDoReportService;
     }
 
-    public void HandleUpdateAsync(
-        ITelegramBotClient botClient,
-        Update update)
+    public void HandleUpdateAsync(ITelegramBotClient botClient, Update update)
     {
         try
         {
@@ -44,6 +44,27 @@ public class UpdateHandler : IUpdateHandler
                     update.Message.Chat,
                     "Сначала зарегистрируйтесь с помощью команды /start.");
 
+                return;
+            }
+
+            const string findCommand = "/find";
+
+            if (command.Equals(
+                    findCommand,
+                    StringComparison.OrdinalIgnoreCase) ||
+                command.StartsWith(
+                    findCommand + " ",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                HandleFind(botClient, update, user, command);
+                return;
+            }
+
+            if (command.Equals(
+                "/report",
+                StringComparison.OrdinalIgnoreCase))
+            {
+                HandleReport(botClient, update, user);
                 return;
             }
 
@@ -154,6 +175,8 @@ public class UpdateHandler : IUpdateHandler
                 Environment.NewLine,
                 "/help - Помощь",
                 "/info - Информация",
+                "/find <начало названия> - Найти задачи",
+                "/report - Показать статистику по задачам",
                 "/addtask <название> - Добавить задачу",
                 "/showtasks - Показать активные задачи",
                 "/showalltasks - Показать все задачи",
@@ -263,5 +286,52 @@ public class UpdateHandler : IUpdateHandler
         _toDoService.Delete(taskId);
 
         botClient.SendMessage(update.Message.Chat, "Задача удалена.");
+    }
+
+    private void HandleFind(ITelegramBotClient botClient, Update update, ToDoUser user, string command)
+    {
+        const string findCommand = "/find";
+
+        string namePrefix = command[findCommand.Length..].Trim();
+
+        IReadOnlyList<ToDoItem> tasks = _toDoService.Find(user, namePrefix);
+
+        if (!tasks.Any())
+        {
+            botClient.SendMessage(update.Message.Chat, "Подходящие задачи не найдены.");
+
+            return;
+        }
+
+        string message = "Найденные задачи:";
+
+        foreach (ToDoItem task in tasks)
+        {
+            message +=
+                $"\n{task.Name} — " +
+                $"{task.CreatedAt:dd.MM.yyyy HH:mm:ss} — " +
+                $"{task.Id}";
+        }
+
+        botClient.SendMessage(update.Message.Chat, message);
+    }
+
+    private void HandleReport(ITelegramBotClient botClient, Update update, ToDoUser user)
+    {
+        (
+            int total,
+            int completed,
+            int active,
+            DateTime generatedAt
+        ) stats = _toDoReportService.GetUserStats(user.UserId);
+
+        string message =
+            $"Статистика по задачам на " +
+            $"{stats.generatedAt:dd.MM.yyyy HH:mm:ss}. " +
+            $"Всего: {stats.total}; " +
+            $"Завершенных: {stats.completed}; " +
+            $"Активных: {stats.active};";
+
+        botClient.SendMessage(update.Message.Chat, message);
     }
 }
