@@ -1,14 +1,14 @@
 public interface IToDoService
 {
-    IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId);
+    Task<IReadOnlyList<ToDoItem>> GetAllByUserIdAsync(Guid userId, CancellationToken ct);
 
-    IReadOnlyList<ToDoItem> GetActiveByUserId(Guid userId);
+    Task<IReadOnlyList<ToDoItem>> GetActiveByUserIdAsync(Guid userId, CancellationToken ct);
 
-    IReadOnlyList<ToDoItem> Find(ToDoUser user, string namePrefix);
+    Task<ToDoItem> AddAsync(ToDoUser user, string name, CancellationToken ct);
 
-    ToDoItem Add(ToDoUser user, string name);
+    Task MarkCompletedAsync(Guid id, CancellationToken ct);
 
-    void MarkCompleted(Guid id);
+    Task DeleteAsync(Guid id, CancellationToken ct);
 
-    void Delete(Guid id);
+    Task<IReadOnlyList<ToDoItem>> FindAsync(ToDoUser user, string namePrefix, CancellationToken ct);
 }

@@ -7,10 +7,16 @@ public class ToDoReportService : IToDoReportService
         _toDoRepository = toDoRepository;
     }
 
-    public (int total,  int completed, int active, DateTime generatedAt) GetUserStats(Guid userId)
+    public async Task<(
+        int total,
+        int completed,
+        int active,
+        DateTime generatedAt
+    )> GetUserStatsAsync(Guid userId, CancellationToken ct)
     {
         IReadOnlyList<ToDoItem> tasks =
-            _toDoRepository.GetAllByUserId(userId);
+            await _toDoRepository
+                .GetAllByUserIdAsync(userId, ct);
 
         int total = tasks.Count;
 
@@ -22,6 +28,10 @@ public class ToDoReportService : IToDoReportService
 
         DateTime generatedAt = DateTime.UtcNow;
 
-        return (total, completed, active, generatedAt);
+        return (
+            total,
+            completed,
+            active,
+            generatedAt);
     }
 }

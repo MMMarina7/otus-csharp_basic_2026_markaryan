@@ -14,17 +14,17 @@ public class ToDoService : IToDoService
         _maxTaskLength = maxTaskLength;
     }
 
-    public IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId)
+    public async Task<IReadOnlyList<ToDoItem>> GetAllByUserIdAsync(Guid userId, CancellationToken ct)
     {
-        return _toDoRepository.GetAllByUserId(userId);
+        return await _toDoRepository.GetAllByUserIdAsync(userId, ct);
     }
 
-    public IReadOnlyList<ToDoItem> GetActiveByUserId(Guid userId)
+    public async Task<IReadOnlyList<ToDoItem>> GetActiveByUserIdAsync(Guid userId, CancellationToken ct)
     {
-        return _toDoRepository.GetActiveByUserId(userId);
+        return await _toDoRepository.GetActiveByUserIdAsync(userId, ct);
     }
 
-    public ToDoItem Add(ToDoUser user, string name)
+    public async Task<ToDoItem> AddAsync(ToDoUser user, string name, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(user);
 
@@ -37,9 +37,15 @@ public class ToDoService : IToDoService
 
         name = name.Trim();
 
-        if (_toDoRepository.CountActive(user.UserId) >= _maxTaskCount)
+        int activeTaskCount =
+            await _toDoRepository.CountActiveAsync(
+                user.UserId,
+                ct);
+
+        if (activeTaskCount >= _maxTaskCount)
         {
-            throw new TaskCountLimitException(_maxTaskCount);
+            throw new TaskCountLimitException(
+                _maxTaskCount);
         }
 
         if (name.Length > _maxTaskLength)
@@ -49,20 +55,28 @@ public class ToDoService : IToDoService
                 _maxTaskLength);
         }
 
-        if (_toDoRepository.ExistsByName(user.UserId, name))
+        bool taskExists =
+            await _toDoRepository.ExistsByNameAsync(
+                user.UserId,
+                name,
+                ct);
+
+        if (taskExists)
         {
             throw new DuplicateTaskException(name);
         }
 
         ToDoItem task = new ToDoItem(name, user);
-        _toDoRepository.Add(task);
+
+        await _toDoRepository.AddAsync(task, ct);
 
         return task;
     }
 
-    public void MarkCompleted(Guid id)
+    public async Task MarkCompletedAsync(Guid id, CancellationToken ct)
     {
-        ToDoItem? task = _toDoRepository.Get(id);
+        ToDoItem? task =
+            await _toDoRepository.GetAsync(id, ct);
 
         if (task == null)
         {
@@ -74,12 +88,12 @@ public class ToDoService : IToDoService
         task.State = ToDoItemState.Completed;
         task.StateChangedAt = DateTime.UtcNow;
 
-        _toDoRepository.Update(task);
+        await _toDoRepository.UpdateAsync(task, ct);
     }
 
-    public void Delete(Guid id)
+    public async Task DeleteAsync(Guid id, CancellationToken ct)
     {
-        ToDoItem? task = _toDoRepository.Get(id);
+        ToDoItem? task = await _toDoRepository.GetAsync(id, ct);
 
         if (task == null)
         {
@@ -88,26 +102,27 @@ public class ToDoService : IToDoService
                 nameof(id));
         }
 
-        _toDoRepository.Delete(id);
+        await _toDoRepository.DeleteAsync(id, ct);
     }
 
-    public IReadOnlyList<ToDoItem> Find(ToDoUser user, string namePrefix)
+    public async Task<IReadOnlyList<ToDoItem>> FindAsync(ToDoUser user, string namePrefix, CancellationToken ct)
+{
+    ArgumentNullException.ThrowIfNull(user);
+
+    if (string.IsNullOrWhiteSpace(namePrefix))
     {
-        ArgumentNullException.ThrowIfNull(user);
-
-        if (string.IsNullOrWhiteSpace(namePrefix))
-        {
-            throw new ArgumentException(
-                "Начало названия задачи не может быть пустым.",
-                nameof(namePrefix));
-        }
-
-        namePrefix = namePrefix.Trim();
-
-        return _toDoRepository.Find(
-            user.UserId,
-            task => task.Name.StartsWith(
-                namePrefix,
-                StringComparison.OrdinalIgnoreCase));
+        throw new ArgumentException(
+            "Начало названия задачи не может быть пустым.",
+            nameof(namePrefix));
     }
+
+    namePrefix = namePrefix.Trim();
+
+    return await _toDoRepository.FindAsync(
+        user.UserId,
+        task => task.Name.StartsWith(
+            namePrefix,
+            StringComparison.OrdinalIgnoreCase),
+        ct);
+}
 }

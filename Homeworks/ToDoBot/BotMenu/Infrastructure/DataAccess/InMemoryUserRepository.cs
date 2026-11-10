@@ -2,18 +2,32 @@ public class InMemoryUserRepository : IUserRepository
 {
     private readonly List<ToDoUser> _users = new();
 
-    public ToDoUser? GetUser(Guid userId)
+    public Task<ToDoUser?> GetUserAsync(Guid userId, CancellationToken ct)
     {
-        return _users.FirstOrDefault(user => user.UserId == userId);
+        ct.ThrowIfCancellationRequested();
+
+        ToDoUser? user = _users.FirstOrDefault(user => user.UserId == userId);
+
+        return Task.FromResult(user);
     }
 
-    public ToDoUser? GetUserByTelegramUserId(long telegramUserId)
+    public Task<ToDoUser?> GetUserByTelegramUserIdAsync(long telegramUserId, CancellationToken ct)
     {
-        return _users.FirstOrDefault(user => user.TelegramUserId == telegramUserId);
+        ct.ThrowIfCancellationRequested();
+
+        ToDoUser? user = _users.FirstOrDefault(user => user.TelegramUserId == telegramUserId);
+
+        return Task.FromResult(user);
     }
 
-    public void Add(ToDoUser user)
+    public Task AddAsync(
+        ToDoUser user,
+        CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
+
         _users.Add(user);
+
+        return Task.CompletedTask;
     }
 }

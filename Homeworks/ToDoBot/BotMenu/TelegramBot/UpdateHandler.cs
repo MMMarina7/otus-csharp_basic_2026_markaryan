@@ -14,35 +14,36 @@ public class UpdateHandler : IUpdateHandler
         _toDoReportService = toDoReportService;
     }
 
-    public void HandleUpdateAsync(ITelegramBotClient botClient, Update update)
+    public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
     {
         try
         {
             string command = update.Message.Text.Trim();
             long telegramUserId = update.Message.From.Id;
 
-            ToDoUser? user = _userService.GetUser(telegramUserId);
+            ToDoUser? user = await _userService.GetUserAsync(telegramUserId, ct);
 
             switch (command.ToLowerInvariant())
             {
                 case "/start":
-                    HandleStart(botClient, update, user);
+                    await HandleStartAsync(botClient, update, user, ct);
                     return;
 
                 case "/help":
-                    HandleHelp(botClient, update, user);
+                    await HandleHelpAsync(botClient, update, user, ct);
                     return;
 
                 case "/info":
-                    HandleInfo(botClient, update);
+                    await HandleInfoAsync(botClient, update, ct);
                     return;
             }
 
             if (user == null)
             {
-                botClient.SendMessage(
-                    update.Message.Chat,
-                    "Сначала зарегистрируйтесь с помощью команды /start.");
+                await botClient.SendMessage(
+                update.Message.Chat,
+                "Сначала зарегистрируйтесь с помощью команды /start.",
+                ct);
 
                 return;
             }
@@ -56,7 +57,7 @@ public class UpdateHandler : IUpdateHandler
                     findCommand + " ",
                     StringComparison.OrdinalIgnoreCase))
             {
-                HandleFind(botClient, update, user, command);
+                await HandleFindAsync(botClient, update, user, command, ct);
                 return;
             }
 
@@ -64,7 +65,7 @@ public class UpdateHandler : IUpdateHandler
                 "/report",
                 StringComparison.OrdinalIgnoreCase))
             {
-                HandleReport(botClient, update, user);
+                await HandleReportAsync(botClient, update, user, ct);
                 return;
             }
 
@@ -79,11 +80,12 @@ public class UpdateHandler : IUpdateHandler
             {
                 string taskName = command[addTaskCommand.Length..].Trim();
 
-                ToDoItem task = _toDoService.Add(user, taskName);
+                ToDoItem task = await _toDoService.AddAsync(user, taskName, ct);
 
-                botClient.SendMessage(
-                    update.Message.Chat,
-                    $"Задача \"{task.Name}\" добавлена. Id: {task.Id}");
+                await botClient.SendMessage(
+                update.Message.Chat,
+                $"Задача \"{task.Name}\" добавлена. Id: {task.Id}",
+                ct);
 
                 return;
             }
@@ -92,7 +94,8 @@ public class UpdateHandler : IUpdateHandler
                 "/showtasks",
                 StringComparison.OrdinalIgnoreCase))
             {
-                HandleShowTasks(botClient, update, user);
+                await HandleShowTasksAsync(botClient, update, user, ct);
+
                 return;
             }
 
@@ -100,7 +103,8 @@ public class UpdateHandler : IUpdateHandler
                 "/showalltasks",
                 StringComparison.OrdinalIgnoreCase))
             {
-                HandleShowAllTasks(botClient, update, user);
+                await HandleShowAllTasksAsync(botClient, update, user, ct);
+
                 return;
             }
 
@@ -113,7 +117,7 @@ public class UpdateHandler : IUpdateHandler
                     completeTaskCommand + " ",
                     StringComparison.OrdinalIgnoreCase))
             {
-                HandleCompleteTask(botClient, update, command);
+                await HandleCompleteTaskAsync(botClient, update, command, ct);
                 return;
             }
 
@@ -126,19 +130,29 @@ public class UpdateHandler : IUpdateHandler
                     removeTaskCommand + " ",
                     StringComparison.OrdinalIgnoreCase))
             {
-                HandleRemoveTask(botClient, update, command);
+                await HandleRemoveTaskAsync(botClient, update, command, ct);
                 return;
             }
 
-            botClient.SendMessage(update.Message.Chat, "Неизвестная команда. Используйте /help для получения справки.");
+            await botClient.SendMessage(
+            update.Message.Chat,
+            "Неизвестная команда. Используйте /help для получения справки.",
+            ct);
         }
         catch (Exception exception)
         {
-            botClient.SendMessage(update.Message.Chat, exception.Message);
+            await botClient.SendMessage(update.Message.Chat, exception.Message, ct);
         }
     }
 
-    private void HandleStart(ITelegramBotClient botClient, Update update, ToDoUser? user)
+    public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken ct)
+    {
+        Console.WriteLine($"Ошибка при обработке сообщения: {exception.Message}");
+
+        return Task.CompletedTask;
+    }
+
+    private async Task HandleStartAsync(ITelegramBotClient botClient, Update update, ToDoUser? user, CancellationToken ct)
     {
         if (user == null)
         {
@@ -147,17 +161,23 @@ public class UpdateHandler : IUpdateHandler
             string telegramUserName =
                 update.Message.From.Username ?? $"User_{telegramUserId}";
 
-            user = _userService.RegisterUser(telegramUserId, telegramUserName);
+            user = await _userService.RegisterUserAsync(telegramUserId, telegramUserName, ct);
 
-            botClient.SendMessage(update.Message.Chat, $"Привет, {user.TelegramUserName}! Вы зарегистрированы.");
+            await botClient.SendMessage(
+                update.Message.Chat,
+                $"Привет, {user.TelegramUserName}! Вы зарегистрированы.",
+                ct);
 
             return;
         }
 
-        botClient.SendMessage(update.Message.Chat, $"{user.TelegramUserName}, вы уже зарегистрированы.");
-    }
+        await botClient.SendMessage(
+            update.Message.Chat,
+            $"{user.TelegramUserName}, вы уже зарегистрированы.",
+            ct);
+    }   
 
-    private void HandleHelp(ITelegramBotClient botClient, Update update, ToDoUser? user)
+    private async Task HandleHelpAsync(ITelegramBotClient botClient, Update update, ToDoUser? user, CancellationToken ct)
     {
         string message;
 
@@ -184,23 +204,21 @@ public class UpdateHandler : IUpdateHandler
                 "/removetask <Id> - Удалить задачу");
         }
 
-        botClient.SendMessage(update.Message.Chat, message);
+        await botClient.SendMessage(update.Message.Chat, message, ct);
     }
 
-    private void HandleInfo(
-        ITelegramBotClient botClient,
-        Update update)
+   private async Task HandleInfoAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
     {
-        botClient.SendMessage(update.Message.Chat, "Версия программы: 1.0. Дата создания: 18.07.2026.");
+        await botClient.SendMessage(update.Message.Chat, "Версия программы: 1.0. Дата создания: 18.07.2026.", ct);
     }
 
-    private void HandleShowTasks(ITelegramBotClient botClient, Update update, ToDoUser user)
+    private async Task HandleShowTasksAsync(ITelegramBotClient botClient, Update update, ToDoUser user, CancellationToken ct)
     {
-        IReadOnlyList<ToDoItem> tasks = _toDoService.GetActiveByUserId(user.UserId);
+        IReadOnlyList<ToDoItem> tasks = await _toDoService.GetActiveByUserIdAsync(user.UserId, ct);
 
         if (!tasks.Any())
         {
-            botClient.SendMessage(update.Message.Chat, "Список активных задач пуст.");
+            await botClient.SendMessage(update.Message.Chat, "Список активных задач пуст.", ct);
 
             return;
         }
@@ -215,18 +233,19 @@ public class UpdateHandler : IUpdateHandler
                 $"{task.Id}";
         }
 
-        botClient.SendMessage(update.Message.Chat, message);
+        await botClient.SendMessage(update.Message.Chat, message, ct);
     }
 
-    private void HandleShowAllTasks(ITelegramBotClient botClient, Update update, ToDoUser user)
+    private async Task HandleShowAllTasksAsync(ITelegramBotClient botClient, Update update, ToDoUser user, CancellationToken ct)
     {
-        IReadOnlyList<ToDoItem> tasks = _toDoService.GetAllByUserId(user.UserId);
+        IReadOnlyList<ToDoItem> tasks = await _toDoService.GetAllByUserIdAsync(user.UserId, ct);
 
         if (!tasks.Any())
         {
-            botClient.SendMessage(
-                update.Message.Chat,
-                "Список задач пуст.");
+            await botClient.SendMessage(
+            update.Message.Chat,
+            "Список задач пуст.",
+            ct);
 
             return;
         }
@@ -253,10 +272,10 @@ public class UpdateHandler : IUpdateHandler
                 $"{task.Id}";
         }
 
-        botClient.SendMessage(update.Message.Chat, message);
+        await botClient.SendMessage(update.Message.Chat, message, ct);
     }
 
-    private void HandleCompleteTask(ITelegramBotClient botClient, Update update, string command)
+    private async Task HandleCompleteTaskAsync(ITelegramBotClient botClient, Update update, string command, CancellationToken ct)
     {
         const string completeTaskCommand = "/completetask";
 
@@ -267,12 +286,12 @@ public class UpdateHandler : IUpdateHandler
             throw new ArgumentException("Неверный формат идентификатора задачи.");
         }
 
-        _toDoService.MarkCompleted(taskId);
+        await _toDoService.MarkCompletedAsync(taskId, ct);
 
-        botClient.SendMessage(update.Message.Chat, "Задача отмечена как выполненная.");
+        await botClient.SendMessage(update.Message.Chat, "Задача отмечена как выполненная.", ct);
     }
 
-    private void HandleRemoveTask(ITelegramBotClient botClient, Update update, string command)
+    private async Task HandleRemoveTaskAsync(ITelegramBotClient botClient, Update update, string command, CancellationToken ct)
     {
         const string removeTaskCommand = "/removetask";
 
@@ -283,22 +302,22 @@ public class UpdateHandler : IUpdateHandler
             throw new ArgumentException("Неверный формат идентификатора задачи.");
         }
 
-        _toDoService.Delete(taskId);
+        await _toDoService.DeleteAsync(taskId, ct);
 
-        botClient.SendMessage(update.Message.Chat, "Задача удалена.");
+        await botClient.SendMessage(update.Message.Chat, "Задача удалена.", ct);
     }
 
-    private void HandleFind(ITelegramBotClient botClient, Update update, ToDoUser user, string command)
+    private async Task HandleFindAsync(ITelegramBotClient botClient, Update update, ToDoUser user, string command, CancellationToken ct)
     {
         const string findCommand = "/find";
 
         string namePrefix = command[findCommand.Length..].Trim();
 
-        IReadOnlyList<ToDoItem> tasks = _toDoService.Find(user, namePrefix);
+        IReadOnlyList<ToDoItem> tasks = await _toDoService.FindAsync(user, namePrefix, ct);
 
         if (!tasks.Any())
         {
-            botClient.SendMessage(update.Message.Chat, "Подходящие задачи не найдены.");
+            await botClient.SendMessage(update.Message.Chat, "Подходящие задачи не найдены.", ct);
 
             return;
         }
@@ -313,17 +332,17 @@ public class UpdateHandler : IUpdateHandler
                 $"{task.Id}";
         }
 
-        botClient.SendMessage(update.Message.Chat, message);
+        await botClient.SendMessage(update.Message.Chat, message, ct);
     }
 
-    private void HandleReport(ITelegramBotClient botClient, Update update, ToDoUser user)
+    private async Task HandleReportAsync(ITelegramBotClient botClient, Update update, ToDoUser user, CancellationToken ct)
     {
         (
             int total,
             int completed,
             int active,
             DateTime generatedAt
-        ) stats = _toDoReportService.GetUserStats(user.UserId);
+        ) stats = await _toDoReportService.GetUserStatsAsync(user.UserId, ct);
 
         string message =
             $"Статистика по задачам на " +
@@ -332,6 +351,6 @@ public class UpdateHandler : IUpdateHandler
             $"Завершенных: {stats.completed}; " +
             $"Активных: {stats.active};";
 
-        botClient.SendMessage(update.Message.Chat, message);
+        await botClient.SendMessage(update.Message.Chat, message, ct);
     }
 }

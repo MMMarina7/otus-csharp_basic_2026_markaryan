@@ -15,11 +15,14 @@ try
     IToDoService toDoService = new ToDoService(toDoRepository, maxTaskCount, maxTaskLength);
 
     IToDoReportService toDoReportService = new ToDoReportService(toDoRepository);
+    
     IUpdateHandler updateHandler = new UpdateHandler(userService, toDoService, toDoReportService);
 
     ITelegramBotClient botClient = new ConsoleBotClient();
 
-    botClient.StartReceiving(updateHandler);
+    using CancellationTokenSource cts = new CancellationTokenSource();
+
+    botClient.StartReceiving(updateHandler, cts.Token);
 }
 catch (Exception exception)
 {
