@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\Otus.ToDoList.ConsoleBot\Otus.ToDoList.ConsoleBot.csproj" />
+    <PackageReference Include="Telegram.Bot" Version="22.10.5" />
   </ItemGroup>
 
   <PropertyGroup>

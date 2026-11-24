@@ -1,5 +1,8 @@
-using Otus.ToDoList.ConsoleBot;
-using Otus.ToDoList.ConsoleBot.Types;
+using Telegram.Bot;
+using Telegram.Bot.Polling;
+using Telegram.Bot.Types;
+using Telegram.Bot.Types.ReplyMarkups;
+using Telegram.Bot.Types.Enums;
 
 public class UpdateHandler : IUpdateHandler
 {
@@ -7,183 +10,179 @@ public class UpdateHandler : IUpdateHandler
     private readonly IToDoService _toDoService;
     private readonly IToDoReportService _toDoReportService;
 
-    public UpdateHandler(IUserService userService, IToDoService toDoService, IToDoReportService toDoReportService)
+    public UpdateHandler(
+        IUserService userService,
+        IToDoService toDoService,
+        IToDoReportService toDoReportService)
     {
         _userService = userService;
         _toDoService = toDoService;
         _toDoReportService = toDoReportService;
     }
 
-    public async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
+    public async Task HandleUpdateAsync(
+        ITelegramBotClient botClient,
+        Update update,
+        CancellationToken ct)
     {
+        Message? message = update.Message;
+
+        if (message?.Text == null || message.From == null)
+        {
+            return;
+        }
+
         try
         {
-            string command = update.Message.Text.Trim();
-            long telegramUserId = update.Message.From.Id;
-
+            string command = message.Text.Trim();
+            long telegramUserId = message.From.Id;
             ToDoUser? user = await _userService.GetUserAsync(telegramUserId, ct);
 
             switch (command.ToLowerInvariant())
             {
                 case "/start":
-                    await HandleStartAsync(botClient, update, user, ct);
+                    await HandleStartAsync(botClient, message, user, ct);
                     return;
-
                 case "/help":
-                    await HandleHelpAsync(botClient, update, user, ct);
+                    await HandleHelpAsync(botClient, message, user, ct);
                     return;
-
                 case "/info":
-                    await HandleInfoAsync(botClient, update, ct);
+                    await HandleInfoAsync(botClient, message, ct);
+                    return;
+                case "/hidekeyboard":
+                    await HandleHideKeyboardAsync(botClient, message, ct);
                     return;
             }
 
             if (user == null)
             {
                 await botClient.SendMessage(
-                update.Message.Chat,
-                "Сначала зарегистрируйтесь с помощью команды /start.",
-                ct);
+                    message.Chat,
+                    "Сначала зарегистрируйтесь с помощью команды /start.",
+                    replyMarkup: CreateStartKeyboard(),
+                    cancellationToken: ct);
 
                 return;
             }
 
             const string findCommand = "/find";
-
-            if (command.Equals(
-                    findCommand,
-                    StringComparison.OrdinalIgnoreCase) ||
-                command.StartsWith(
-                    findCommand + " ",
-                    StringComparison.OrdinalIgnoreCase))
+            if (command.Equals(findCommand, StringComparison.OrdinalIgnoreCase) ||
+                command.StartsWith(findCommand + " ", StringComparison.OrdinalIgnoreCase))
             {
-                await HandleFindAsync(botClient, update, user, command, ct);
+                await HandleFindAsync(botClient, message, user, command, ct);
                 return;
             }
 
-            if (command.Equals(
-                "/report",
-                StringComparison.OrdinalIgnoreCase))
+            if (command.Equals("/report", StringComparison.OrdinalIgnoreCase))
             {
-                await HandleReportAsync(botClient, update, user, ct);
+                await HandleReportAsync(botClient, message, user, ct);
                 return;
             }
 
             const string addTaskCommand = "/addtask";
-
-            if (command.Equals(
-                    addTaskCommand,
-                    StringComparison.OrdinalIgnoreCase) ||
-                command.StartsWith(
-                    addTaskCommand + " ",
-                    StringComparison.OrdinalIgnoreCase))
+            if (command.Equals(addTaskCommand, StringComparison.OrdinalIgnoreCase) ||
+                command.StartsWith(addTaskCommand + " ", StringComparison.OrdinalIgnoreCase))
             {
                 string taskName = command[addTaskCommand.Length..].Trim();
-
                 ToDoItem task = await _toDoService.AddAsync(user, taskName, ct);
 
                 await botClient.SendMessage(
-                update.Message.Chat,
-                $"Задача \"{task.Name}\" добавлена. Id: {task.Id}",
-                ct);
-
+                    message.Chat,
+                    $"Задача \"{task.Name}\" добавлена. Id: {task.Id}",
+                    cancellationToken: ct);
                 return;
             }
 
-            if (command.Equals(
-                "/showtasks",
-                StringComparison.OrdinalIgnoreCase))
+            if (command.Equals("/showtasks", StringComparison.OrdinalIgnoreCase))
             {
-                await HandleShowTasksAsync(botClient, update, user, ct);
-
+                await HandleShowTasksAsync(botClient, message, user, ct);
                 return;
             }
 
-            if (command.Equals(
-                "/showalltasks",
-                StringComparison.OrdinalIgnoreCase))
+            if (command.Equals("/showalltasks", StringComparison.OrdinalIgnoreCase))
             {
-                await HandleShowAllTasksAsync(botClient, update, user, ct);
-
+                await HandleShowAllTasksAsync(botClient, message, user, ct);
                 return;
             }
 
             const string completeTaskCommand = "/completetask";
-
-            if (command.Equals(
-                    completeTaskCommand,
-                    StringComparison.OrdinalIgnoreCase) ||
-                command.StartsWith(
-                    completeTaskCommand + " ",
-                    StringComparison.OrdinalIgnoreCase))
+            if (command.Equals(completeTaskCommand, StringComparison.OrdinalIgnoreCase) ||
+                command.StartsWith(completeTaskCommand + " ", StringComparison.OrdinalIgnoreCase))
             {
-                await HandleCompleteTaskAsync(botClient, update, command, ct);
+                await HandleCompleteTaskAsync(botClient, message, command, ct);
                 return;
             }
 
             const string removeTaskCommand = "/removetask";
-
-            if (command.Equals(
-                    removeTaskCommand,
-                    StringComparison.OrdinalIgnoreCase) ||
-                command.StartsWith(
-                    removeTaskCommand + " ",
-                    StringComparison.OrdinalIgnoreCase))
+            if (command.Equals(removeTaskCommand, StringComparison.OrdinalIgnoreCase) ||
+                command.StartsWith(removeTaskCommand + " ", StringComparison.OrdinalIgnoreCase))
             {
-                await HandleRemoveTaskAsync(botClient, update, command, ct);
+                await HandleRemoveTaskAsync(botClient, message, command, ct);
                 return;
             }
 
             await botClient.SendMessage(
-            update.Message.Chat,
-            "Неизвестная команда. Используйте /help для получения справки.",
-            ct);
+                message.Chat,
+                "Неизвестная команда. Используйте /help для получения справки.",
+                cancellationToken: ct);
         }
         catch (Exception exception)
         {
-            await botClient.SendMessage(update.Message.Chat, exception.Message, ct);
+            await botClient.SendMessage(
+                message.Chat,
+                exception.Message,
+                cancellationToken: ct);
         }
     }
 
-    public Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken ct)
+    public Task HandleErrorAsync(
+        ITelegramBotClient botClient,
+        Exception exception,
+        HandleErrorSource source,
+        CancellationToken ct)
     {
-        Console.WriteLine($"Ошибка при обработке сообщения: {exception.Message}");
-
+        Console.WriteLine($"Ошибка Telegram ({source}): {exception.Message}");
         return Task.CompletedTask;
     }
 
-    private async Task HandleStartAsync(ITelegramBotClient botClient, Update update, ToDoUser? user, CancellationToken ct)
+    private async Task HandleStartAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        ToDoUser? user,
+        CancellationToken ct)
     {
         if (user == null)
         {
-            long telegramUserId = update.Message.From.Id;
-
-            string telegramUserName =
-                update.Message.From.Username ?? $"User_{telegramUserId}";
-
+            long telegramUserId = message.From!.Id;
+            string telegramUserName = message.From.Username ?? $"User_{telegramUserId}";
             user = await _userService.RegisterUserAsync(telegramUserId, telegramUserName, ct);
 
-            await botClient.SendMessage(
-                update.Message.Chat,
+           await botClient.SendMessage(
+                message.Chat,
                 $"Привет, {user.TelegramUserName}! Вы зарегистрированы.",
-                ct);
-
+                replyMarkup: CreateMainKeyboard(),
+                cancellationToken: ct);
             return;
         }
 
         await botClient.SendMessage(
-            update.Message.Chat,
+            message.Chat,
             $"{user.TelegramUserName}, вы уже зарегистрированы.",
-            ct);
-    }   
+            replyMarkup: CreateMainKeyboard(),
+            cancellationToken: ct);
+    }
 
-    private async Task HandleHelpAsync(ITelegramBotClient botClient, Update update, ToDoUser? user, CancellationToken ct)
+    private async Task HandleHelpAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        ToDoUser? user,
+        CancellationToken ct)
     {
-        string message;
+        string responseText;
 
         if (user == null)
         {
-            message = string.Join(
+            responseText = string.Join(
                 Environment.NewLine,
                 "/start - Начало работы",
                 "/help - Помощь",
@@ -191,7 +190,7 @@ public class UpdateHandler : IUpdateHandler
         }
         else
         {
-            message = string.Join(
+            responseText = string.Join(
                 Environment.NewLine,
                 "/help - Помощь",
                 "/info - Информация",
@@ -204,81 +203,103 @@ public class UpdateHandler : IUpdateHandler
                 "/removetask <Id> - Удалить задачу");
         }
 
-        await botClient.SendMessage(update.Message.Chat, message, ct);
+        ReplyKeyboardMarkup keyboard = user == null
+            ? CreateStartKeyboard()
+            : CreateMainKeyboard();
+
+        await botClient.SendMessage(
+            message.Chat,
+            responseText,
+            replyMarkup: keyboard,
+            cancellationToken: ct);
     }
 
-   private async Task HandleInfoAsync(ITelegramBotClient botClient, Update update, CancellationToken ct)
+    private async Task HandleInfoAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        CancellationToken ct)
     {
-        await botClient.SendMessage(update.Message.Chat, "Версия программы: 1.0. Дата создания: 18.07.2026.", ct);
+        await botClient.SendMessage(
+            message.Chat,
+            "Версия программы: 1.0. Дата создания: 18.07.2026.",
+            cancellationToken: ct);
     }
 
-    private async Task HandleShowTasksAsync(ITelegramBotClient botClient, Update update, ToDoUser user, CancellationToken ct)
+    private async Task HandleShowTasksAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        ToDoUser user,
+        CancellationToken ct)
     {
         IReadOnlyList<ToDoItem> tasks = await _toDoService.GetActiveByUserIdAsync(user.UserId, ct);
 
         if (!tasks.Any())
         {
-            await botClient.SendMessage(update.Message.Chat, "Список активных задач пуст.", ct);
-
+            await botClient.SendMessage(
+                message.Chat,
+                "Список активных задач пуст.",
+                cancellationToken: ct);
             return;
         }
 
-        string message = "Активные задачи:";
-
+        string responseText = "Активные задачи:";
         foreach (ToDoItem task in tasks)
         {
-            message +=
+            responseText +=
                 $"\n{task.Name} — " +
                 $"{task.CreatedAt:dd.MM.yyyy HH:mm:ss} — " +
-                $"{task.Id}";
+                $"`{task.Id}`";
         }
 
-        await botClient.SendMessage(update.Message.Chat, message, ct);
+        await botClient.SendMessage(
+            message.Chat,
+            responseText,
+            parseMode: ParseMode.Markdown,
+            cancellationToken: ct);
     }
 
-    private async Task HandleShowAllTasksAsync(ITelegramBotClient botClient, Update update, ToDoUser user, CancellationToken ct)
+    private async Task HandleShowAllTasksAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        ToDoUser user,
+        CancellationToken ct)
     {
         IReadOnlyList<ToDoItem> tasks = await _toDoService.GetAllByUserIdAsync(user.UserId, ct);
 
         if (!tasks.Any())
         {
             await botClient.SendMessage(
-            update.Message.Chat,
-            "Список задач пуст.",
-            ct);
-
+                message.Chat,
+                "Список задач пуст.",
+                cancellationToken: ct);
             return;
         }
 
-        string message = "Все задачи:";
-
+        string responseText = "Все задачи:";
         foreach (ToDoItem task in tasks)
         {
-            string state;
-
-            if (task.State == ToDoItemState.Active)
-            {
-                state = "Активна";
-            }
-            else
-            {
-                state = "Выполнена";
-            }
-
-            message +=
+            string state = task.State == ToDoItemState.Active ? "Активна" : "Выполнена";
+            responseText +=
                 $"\n{task.Name} — " +
                 $"{state} — " +
                 $"{task.CreatedAt:dd.MM.yyyy HH:mm:ss} — " +
-                $"{task.Id}";
+                $"`{task.Id}`";
         }
 
-        await botClient.SendMessage(update.Message.Chat, message, ct);
+        await botClient.SendMessage(
+            message.Chat,
+            responseText,
+            parseMode: ParseMode.Markdown,
+            cancellationToken: ct);
     }
 
-    private async Task HandleCompleteTaskAsync(ITelegramBotClient botClient, Update update, string command, CancellationToken ct)
+    private async Task HandleCompleteTaskAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        string command,
+        CancellationToken ct)
     {
         const string completeTaskCommand = "/completetask";
-
         string idText = command[completeTaskCommand.Length..].Trim();
 
         if (!Guid.TryParse(idText, out Guid taskId))
@@ -287,14 +308,19 @@ public class UpdateHandler : IUpdateHandler
         }
 
         await _toDoService.MarkCompletedAsync(taskId, ct);
-
-        await botClient.SendMessage(update.Message.Chat, "Задача отмечена как выполненная.", ct);
+        await botClient.SendMessage(
+            message.Chat,
+            "Задача отмечена как выполненная.",
+            cancellationToken: ct);
     }
 
-    private async Task HandleRemoveTaskAsync(ITelegramBotClient botClient, Update update, string command, CancellationToken ct)
+    private async Task HandleRemoveTaskAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        string command,
+        CancellationToken ct)
     {
         const string removeTaskCommand = "/removetask";
-
         string idText = command[removeTaskCommand.Length..].Trim();
 
         if (!Guid.TryParse(idText, out Guid taskId))
@@ -303,39 +329,53 @@ public class UpdateHandler : IUpdateHandler
         }
 
         await _toDoService.DeleteAsync(taskId, ct);
-
-        await botClient.SendMessage(update.Message.Chat, "Задача удалена.", ct);
+        await botClient.SendMessage(
+            message.Chat,
+            "Задача удалена.",
+            cancellationToken: ct);
     }
 
-    private async Task HandleFindAsync(ITelegramBotClient botClient, Update update, ToDoUser user, string command, CancellationToken ct)
+    private async Task HandleFindAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        ToDoUser user,
+        string command,
+        CancellationToken ct)
     {
         const string findCommand = "/find";
-
         string namePrefix = command[findCommand.Length..].Trim();
-
         IReadOnlyList<ToDoItem> tasks = await _toDoService.FindAsync(user, namePrefix, ct);
 
         if (!tasks.Any())
         {
-            await botClient.SendMessage(update.Message.Chat, "Подходящие задачи не найдены.", ct);
-
+            await botClient.SendMessage(
+                message.Chat,
+                "Подходящие задачи не найдены.",
+                cancellationToken: ct);
             return;
         }
 
-        string message = "Найденные задачи:";
-
+        string responseText = "Найденные задачи:";
         foreach (ToDoItem task in tasks)
         {
-            message +=
+            responseText +=
                 $"\n{task.Name} — " +
                 $"{task.CreatedAt:dd.MM.yyyy HH:mm:ss} — " +
-                $"{task.Id}";
+                $"`{task.Id}`";
         }
 
-        await botClient.SendMessage(update.Message.Chat, message, ct);
+        await botClient.SendMessage(
+            message.Chat,
+            responseText,
+            parseMode: ParseMode.Markdown,
+            cancellationToken: ct);
     }
 
-    private async Task HandleReportAsync(ITelegramBotClient botClient, Update update, ToDoUser user, CancellationToken ct)
+    private async Task HandleReportAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        ToDoUser user,
+        CancellationToken ct)
     {
         (
             int total,
@@ -344,13 +384,63 @@ public class UpdateHandler : IUpdateHandler
             DateTime generatedAt
         ) stats = await _toDoReportService.GetUserStatsAsync(user.UserId, ct);
 
-        string message =
-            $"Статистика по задачам на " +
+        string responseText =
+            "Статистика по задачам на " +
             $"{stats.generatedAt:dd.MM.yyyy HH:mm:ss}. " +
             $"Всего: {stats.total}; " +
             $"Завершенных: {stats.completed}; " +
             $"Активных: {stats.active};";
 
-        await botClient.SendMessage(update.Message.Chat, message, ct);
+        await botClient.SendMessage(
+            message.Chat,
+            responseText,
+            cancellationToken: ct);
+    }
+
+    private async Task HandleHideKeyboardAsync(
+        ITelegramBotClient botClient,
+        Message message,
+        CancellationToken ct)
+    {
+        await botClient.SendMessage(
+            message.Chat,
+            "Клавиатура скрыта. Чтобы вернуть её, используйте /start.",
+            replyMarkup: new ReplyKeyboardRemove(),
+            cancellationToken: ct);
+    }
+
+    private static ReplyKeyboardMarkup CreateStartKeyboard()
+    {
+        return new ReplyKeyboardMarkup(
+            new[]
+            {
+                new[]
+                {
+                    new KeyboardButton("/start")
+                }
+            })
+        {
+            ResizeKeyboard = true
+        };
+    }
+
+    private static ReplyKeyboardMarkup CreateMainKeyboard()
+    {
+        return new ReplyKeyboardMarkup(
+            new[]
+            {
+                new[]
+                {
+                    new KeyboardButton("/showalltasks")
+                },
+                new[]
+                {
+                    new KeyboardButton("/showtasks"),
+                    new KeyboardButton("/report")
+                }
+            })
+        {
+            ResizeKeyboard = true
+        };
     }
 }
